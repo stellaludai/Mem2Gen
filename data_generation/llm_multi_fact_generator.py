@@ -450,10 +450,6 @@ class IntersectionDatasetGenerator(BaseDatasetGenerator):
 
 
 if __name__ == "__main__":
-    # counting
-    generator = CountingDatasetGenerator()
-    generator.generate_dataset(total_sample=1000, output_dir="xxx")
-
     # chaining
     generator = ChainingDatasetGenerator()
     generator.generate_dataset(total_sample=1000, output_dir="xxx")
