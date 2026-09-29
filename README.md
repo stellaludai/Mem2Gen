@@ -14,6 +14,23 @@ Fine-tuning an LLM on new facts teaches it to **recall** them within a few epoch
 | 2 | **Self-patching oracle.** In the fine-tuned model, copying the entity representation from one layer to another in the *same* prompt restores many failed two-hop answers. The knowledge is stored, but not where the computation needs it. | [`patch/`](patch) |
 | 3 | **LRSD.** A layer-wise representation self-distillation loss aligns a middle layer with a late layer during fine-tuning. It nearly doubles chaining accuracy on Qwen2.5 (+95%), gives about +20% on LLaMA-3.2, and leaves memorization intact. | [`distill/`](distill) |
 
+### Watching new knowledge permeate the network
+
+<p align="center">
+  <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
+</p>
+
+Each map is a self-patching scan of one fine-tuning checkpoint: LLaMA-3.1-8B fine-tuned on the two facts of one chaining item (Figure 4 of the paper).
+
+- **Cell (*s*, *t*).** Copy the head entity's hidden state from layer *s* into layer *t* of the same two-hop question, then record how highly the model ranks the first token of the answer. Bright means ranked first.
+- **Diagonal.** The model as is, with no patch.
+
+What the animation shows:
+
+- **Memorized, not yet used.** In the epochs after both facts are memorized, cells that rank the answer first appear *off* the diagonal. In the left run the first appears at epoch 9 and there are 15 by epoch 10; in the right run they appear from epoch 10. The knowledge is stored, but not at the layers where the two-hop computation reads it.
+- **Left run.** The bright region grows until it covers the diagonal at epoch 21. From then on the model answers the two-hop question with no patch.
+- **Right run.** The region stops growing at about 6% of layer pairs and never covers the diagonal, and the two-hop question is never answered.
+
 ## Contents
 
 - [Installation](#installation)
@@ -140,6 +157,21 @@ Self-patching is an adaptation of activation patching:
 3. Let the forward pass continue and score the greedy answer.
 
 Scanning all *L × L* layer pairs gives a map whose diagonal is the unpatched model. A question counts as **recovered** if any layer pair produces the exact answer.
+
+Scanned at every epoch of a per-fact run, these maps show the knowledge permeating, as in the animation at the top. The animation below replays the scans from the paper's appendix for 37 per-fact LLaMA-3.1-8B runs, aligned at the epoch their facts are memorized.
+
+<p align="center">
+  <img src="assets/permeation_mosaic.gif" width="100%" alt="Self-patching maps of 37 LLaMA-3.1-8B fine-tuning runs, aligned at memorization: in the 26 runs that generalize the bright region reaches the diagonal as the model starts answering; the 11 that never generalize never answer">
+</p>
+
+- **Runs shown.** The 26 runs that generalize and the 11 that never do. Two runs are left out:
+  - Four generalizing runs, because their scans stop before they first answer.
+  - One run that already answers the two-hop question before training.
+- **Not a random sample.** Of the 100 per-fact LLaMA-3.1-8B runs in the paper, 39 answer the two-hop question at some epoch and 58 never do.
+- **Map colour.** The reciprocal rank of the answer's first token, predicted right after the question (1 = the model's top prediction). This is a proxy: the first token can rank first while the full greedy answer is still wrong. Such maps are marked †.
+- **✓ badge.** Taken from the training log. It is green while the greedy two-hop answer is correct, and grey once it has been correct but is wrong again.
+- **Frames.** Runs that generalize are scanned every epoch up to their first correct answer; the others every second epoch. In-between maps are cross-faded, and each run's last scan is held.
+- **Source.** The animations replay the paper's per-epoch scans (Figure 4 and Appendix D). The per-epoch scanning script is not part of this minimal release.
 
 ```bash
 # RUN = a multi-fact run directory from section 1 (needs checkpoint-last-epoch50/)
