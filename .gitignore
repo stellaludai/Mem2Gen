@@ -1,0 +1,73 @@
+# Mem2Gen public release: everything is ignored unless whitelisted below.
+# The minimal set reproduces three chaining results on STaRK-Prime:
+#   train/ + validation/  knowing-using gap
+#   patch/                self-patching oracle
+#   distill/              layer-wise representation self-distillation (LRSD)
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/assets/
+
+!/environment/
+/environment/*
+!/environment/requirements.txt
+
+# data: the full chaining file is shipped because seeded sampling indexes the whole list;
+# data/inject_lrsd/chaining_* is regenerated from it by distill/make_inject_data.py
+!/data/
+/data/*
+!/data/multi_fact_data_template/
+/data/multi_fact_data_template/*
+!/data/multi_fact_data_template/chaining_tasks.json
+!/data/multi_fact_data_template/summary.json
+
+!/train/
+/train/*
+!/train/train_multi_fact.py
+!/train/dataloader.py
+!/train/training_utils.py
+!/train/eval_callback.py
+!/train/run_specific_samples.py
+!/train/knowing_using_gap.py
+!/train/configs/
+/train/configs/*
+!/train/configs/experiment_configs_specific_samples/
+/train/configs/experiment_configs_specific_samples/*
+!/train/configs/experiment_configs_specific_samples/multi_specific_sample_template.yaml
+!/train/configs/experiment_configs_specific_samples/multi_specific_sample_template_fft.yaml
+!/train/configs/multi_experiment_configs_model/
+/train/configs/multi_experiment_configs_model/*
+!/train/configs/multi_experiment_configs_model/multi_chaining_*_n1000.yaml
+
+!/validation/
+/validation/*
+!/validation/evaluate_checkpoints.py
+
+!/patch/
+/patch/*
+!/patch/multi_fact_experiment_nsamples.py
+!/patch/layer_patching.py
+!/patch/utils.py
+!/patch/compute_oracle.py
+
+!/distill/
+/distill/*
+!/distill/common.py
+!/distill/train_inject_lrsd.py
+!/distill/make_inject_data.py
+!/distill/analyze_scale.py
+!/distill/plot_scale.py
+!/distill/make_jobs_scale.py
+!/distill/run_queue.py
+!/distill/run_inject_scale.sh
+
+!/tests/
+/tests/*
+!/tests/smoke_test.sh
+
+# never commit these, even inside whitelisted directories
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store

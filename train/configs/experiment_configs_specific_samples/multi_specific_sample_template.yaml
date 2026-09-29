@@ -1,0 +1,72 @@
+experiment:
+  name: multi_specific_sample_training
+  seed: 42  # ignored when specific_samples is set
+
+dataset:
+  name: multi_fact_chaining
+  data_dir: ../data/multi_fact_data_template
+  task_type: chaining_tasks
+  data_size: 1  # one fact per run (names the n1 output directory)
+  specific_samples: null  # set from the command line, e.g. --specific_samples 106
+  dataloader_drop_last: false
+
+evaluation:
+  eval_batch_size: 1
+  eval_tasks:  # skip the flip diagnostic (evaluation only, training is unchanged)
+    - memorization
+    - chaining
+
+model:
+  name: Qwen/Qwen2.5-1.5B-Instruct
+  short_name: qwen2.5-1.5b
+  #name: Qwen/Qwen2.5-3B-Instruct
+  #short_name: qwen2.5-3b
+  #name: meta-llama/Llama-3.2-1B-Instruct
+  #short_name: llama3.2-1b
+  #name: meta-llama/Llama-3.2-3B-Instruct
+  #short_name: llama3.2-3b
+
+sft:
+  output_dir: null
+  run_name: null
+  num_train_epochs: 30
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  lr_scheduler_type: constant
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  completion_only_loss: true
+  bf16: true
+  logging_steps: 1
+  save_strategy: 'no'
+  save_total_limit: null
+  save_only_model: true
+  report_to: none  # 'swanlab' to log to swanlab
+  dataloader_num_workers: 1
+  dataloader_pin_memory: true
+  ddp_find_unused_parameters: false
+  gradient_checkpointing: false
+
+lora:
+  r: 8
+  lora_alpha: 32
+  lora_dropout: 0.05
+  task_type: CAUSAL_LM
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+  lora_layers: all
+
+checkpoint:
+  base_dir: ../checkpoints/per_fact/lora  # relative to train/
+  save_on_memorization_100: false
+  save_last_epoch: false
+  save_every_epoch: false  # only training_logs.json is needed
+
+swanlab:
+  project: multi_fact_specific_samples

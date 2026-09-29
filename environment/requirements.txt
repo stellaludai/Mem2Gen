@@ -1,0 +1,19 @@
+--extra-index-url https://download.pytorch.org/whl/cu124
+# Python 3.11. Every third-party package the release code imports, pinned to the tested versions.
+torch==2.6.0+cu124
+transformers==5.11.0
+trl==1.5.1
+peft==0.15.2
+datasets==5.0.0
+numpy==1.26.4
+scipy==1.15.2
+matplotlib==3.10.1
+PyYAML==6.0.2
+tqdm==4.67.1
+# patch/ only: TransformerLens 2.x cannot read transformers-5 configs, 4.x dropped HookedTransformer
+transformer-lens==3.9.0
+# optional: only used when sft.report_to is swanlab
+swanlab==0.7.20
+# not imported directly, pinned because training and tokenization depend on them
+accelerate==1.13.0
+tokenizers==0.22.2

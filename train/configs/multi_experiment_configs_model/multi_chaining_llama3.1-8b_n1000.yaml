@@ -1,0 +1,58 @@
+experiment:
+  name: multi_chaining_llama3.1-8b_n1000
+  seed: 1340
+dataset:
+  name: multi_fact_chaining
+  data_dir: ../data/multi_fact_data_template
+  task_type: chaining_tasks
+  data_size: 1000
+  dataloader_drop_last: false
+evaluation:
+  eval_batch_size: 10
+  eval_tasks:  # skip the flip diagnostic (evaluation only, training is unchanged)
+  - memorization
+  - chaining
+model:
+  name: meta-llama/Llama-3.1-8B-Instruct
+  short_name: llama3.1-8b
+sft:
+  output_dir: null
+  run_name: null
+  num_train_epochs: 50
+  per_device_train_batch_size: 10
+  gradient_accumulation_steps: 1
+  lr_scheduler_type: constant
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  completion_only_loss: true
+  bf16: true
+  logging_steps: 1
+  save_strategy: 'no'
+  save_total_limit: null
+  save_only_model: true
+  report_to: none  # 'swanlab' to log to swanlab
+  dataloader_num_workers: 1
+  dataloader_pin_memory: true
+  ddp_find_unused_parameters: false
+  gradient_checkpointing: false
+lora:
+  r: 8
+  lora_alpha: 32
+  lora_dropout: 0.05
+  task_type: CAUSAL_LM
+  target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+  lora_layers: all
+checkpoint:
+  base_dir: ../checkpoints/multi_fact_checkpoints
+  save_on_memorization_100: true
+  save_last_epoch: true
+  save_every_epoch: false
+swanlab:
+  project: multi_fact_scaling
