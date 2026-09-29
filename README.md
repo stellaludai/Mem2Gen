@@ -182,7 +182,8 @@ python patch/compute_oracle.py $RUN/patching_results_entity_offset0.npy --topk 1
 - **Script options.** The base model is read from `$RUN/config.yaml`. For a single GPU, replace `torchrun --nproc_per_node=4` with `python`. `--max_instances 100` scans only the first 100 questions, for a quick estimate.
 - **Grid format.** The grid has shape `(N, 2, L, L)`: question × {first-answer-token reciprocal rank, greedy exact match} × source layer × target layer.
 - **Oracle output.** `compute_oracle.py` prints the accuracy without patching (`no_patch`, the `[0, 0]` cell) and the oracle (any cell correct). With `--topk`, it also prints the layer pairs that rescue the most failed questions.
-- **Runtime.** The scan runs L² forward passes per question in fp32, about 2 min per question for Qwen2.5-3B (L = 36). All 500 questions take about 4–5 h on 4 A800 GPUs.
+- **Runtime.** The scan runs L² forward passes per question in fp32. All 500 questions took 3.3 h for Qwen2.5-1.5B (L = 28) on 4 A800 GPUs. Qwen2.5-3B (L = 36) needs about 2 min per question, so about 4–5 h on 4 GPUs.
+- **Rerun from this repository.** Qwen2.5-1.5B from scratch gave memorization 0.998, chaining 0.086 without patching, and oracle 0.480 (5.6×). The paper reports 0.998, 0.078 and 0.440 (5.6×).
 
 Expected values (paper, STaRK-Prime chaining, 1,000 injected facts, N = 500 two-hop questions):
 
@@ -244,7 +245,7 @@ LRSD beats the baseline in all 12 seed-paired comparisons at both λ (two-sided 
 ## Reproducibility notes
 
 - **Two metrics.** Per-epoch scores (`training_logs.json`, per-fact runs) use a lenient match: the output contains a single gold answer, or the other way round. The paper's multi-fact numbers use `validation/evaluate_checkpoints.py` and the LRSD logs, which require an exact match against any gold answer of the question.
-- **Hardware and library versions.** Training and greedy decoding are not bit-identical across GPUs and library versions. Expect roughly ±0.02 on the multi-fact numbers and ±0.5 epochs on T_mem / T_gen.
+- **Hardware and library versions.** Training and greedy decoding are not bit-identical across GPUs and library versions. Expect roughly ±0.02 on the multi-fact accuracies and ±0.5 epochs on T_mem / T_gen. The self-patching oracle takes the best of L² layer pairs, so it varies more (±0.05); the oracle / no-patch ratio is more stable.
 - **LLaMA chat template.** The LLaMA-3.2 chat template writes today's date into the system prompt. All pipelines here pin it to a fixed date, so a model is trained, evaluated and patched with the same prompt whatever day each step runs. The paper's LLaMA runs outside LRSD used the date of the day they ran, so re-run LLaMA numbers can differ slightly from the paper. The Qwen and LLaMA-3.1 templates contain no date.
 
 ## Repository layout
