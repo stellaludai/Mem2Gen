@@ -40,7 +40,6 @@ What the animation shows:
 
 - [Installation](#installation)
 - [Data](#data)
-- [Smoke test](#smoke-test)
 - [1. Knowing–using gap](#1-knowingusing-gap)
 - [2. Self-patching oracle](#2-self-patching-oracle)
 - [3. LRSD: layer-wise representation self-distillation](#3-lrsd-layer-wise-representation-self-distillation)
@@ -90,13 +89,6 @@ The experiments train only on the single-hop facts and test on the two-hop quest
 
 `summary.json` also lists two task files that are not shipped (`counting_tasks`, `intersection_tasks`). The loader prints a warning for each and skips it.
 
-## Smoke test
-
-```bash
-bash tests/smoke_test.sh 0        # GPU id; ~9 min on one 80 GB GPU, needs Qwen/Qwen2.5-1.5B-Instruct
-```
-
-The smoke test runs every entry point below at toy scale and prints one PASS/FAIL line per step: data sampling, a 1-epoch injection run, two per-fact runs plus the gap aggregator, a 2-question self-patching grid plus the oracle, the checkpoint evaluator, and two 1-epoch LRSD runs plus their summary. It writes only to `$SMOKE_OUT` (a fresh temporary directory by default) and to `data/inject_lrsd/`. The toy runs are too short to learn anything; the test checks that the pipeline works, not the paper's numbers.
 
 ## 1. Knowing–using gap
 
@@ -121,20 +113,8 @@ python train/knowing_using_gap.py --method fft checkpoints/per_fact/fft
 - **T_gen:** the first epoch from which the two-hop question stays correct for 10 consecutive evaluations.
 - **A_mem / A_gen:** the final-epoch accuracies.
 
-For another model, edit `model.name` / `model.short_name` in the template; Llama-3.2-1B and Qwen2.5-3B are listed there as comments. Expected values (paper, 100 items, STaRK-Prime chaining):
+For another model, edit `model.name` / `model.short_name` in the template; Llama-3.2-1B and Qwen2.5-3B are listed there as comments. 
 
-| Method | Model | T_mem | T_gen | ΔT | A_mem | A_gen | ΔA |
-|---|---|---|---|---|---|---|---|
-| LoRA | Qwen2.5-1.5B | 10.9 | 16.9 | 6.0 | 1.00 | 0.33 | 0.67 |
-| LoRA | LLaMA-3.2-1B | 9.8 | 15.9 | 6.1 | 1.00 | 0.32 | 0.68 |
-| LoRA | Qwen2.5-3B | 10.9 | 16.9 | 6.0 | 1.00 | 0.32 | 0.68 |
-| LoRA | LLaMA-3.2-3B | 10.4 | 15.0 | 4.6 | 1.00 | 0.30 | 0.70 |
-| FFT | Qwen2.5-1.5B | 2.1 | 4.4 | 2.3 | 1.00 | 0.59 | 0.41 |
-| FFT | LLaMA-3.2-1B | 2.6 | 7.1 | 4.5 | 1.00 | 0.30 | 0.70 |
-| FFT | Qwen2.5-3B | 2.5 | 4.6 | 2.1 | 1.00 | 0.61 | 0.39 |
-| FFT | LLaMA-3.2-3B | 2.4 | 7.9 | 5.5 | 1.00 | 0.32 | 0.68 |
-
-The 1B/1.5B rows were produced with exactly this code and these item IDs. The 3B rows come from earlier runs of the same protocol, so expect differences of about ±0.5 epochs and ±0.05 accuracy.
 
 ### Multi-fact runs: 1,000 injected facts
 
@@ -153,8 +133,6 @@ The recipe is LoRA r = 8, lr 1e-4, batch 10 and 50 epochs. One run takes about 4
 
 ## 2. Self-patching oracle
 
-<p align="center"><img src="assets/self_patching.png" width="36%" alt="Self-patching: copy an entity's hidden state from layer i to layer j of the same prompt"></p>
-
 Self-patching is an adaptation of activation patching:
 
 1. Run the fine-tuned model on a two-hop question and read the residual stream after decoder block *l*<sub>src</sub> at the tokens of the question's head entity.
@@ -169,9 +147,9 @@ Scanned at every epoch of a per-fact run, these maps show the knowledge permeati
   <img src="assets/permeation_mosaic.gif" width="100%" alt="More cases of knowledge permeation: self-patching maps of 16 fine-tuning runs aligned at memorization; in the eight runs that generalize the bright region spreads until it covers the diagonal and the model starts answering, in the eight that never generalize it stops short of the diagonal">
 </p>
 
-- **Selected cases.** Picked from the paper's per-epoch scans (Figure 4 and Appendix D) to show the trend clearly; not a random sample.
-- **Colour and ✓.** Colour is the rank of the answer's first token, as in the animation at the top. ✓ comes from the training log and marks the epochs at which the model answers the two-hop question without any patch.
-- **Frames.** Runs that generalize are scanned every epoch up to their first correct answer; the others every second epoch. In-between maps are cross-faded, and each run's last scan is held. The per-epoch scanning script is not part of this minimal release.
+
+- **Colour and ✓.** Colour is the rank of the GT answer's first token, as in the animation at the top. ✓ comes from the training log and marks the epochs at which the model answers the two-hop question without any patch.
+
 
 ```bash
 # RUN = a multi-fact run directory from section 1 (needs checkpoint-last-epoch50/)
@@ -182,21 +160,8 @@ python patch/compute_oracle.py $RUN/patching_results_entity_offset0.npy --topk 1
 - **Script options.** The base model is read from `$RUN/config.yaml`. For a single GPU, replace `torchrun --nproc_per_node=4` with `python`. `--max_instances 100` scans only the first 100 questions, for a quick estimate.
 - **Grid format.** The grid has shape `(N, 2, L, L)`: question × {first-answer-token reciprocal rank, greedy exact match} × source layer × target layer.
 - **Oracle output.** `compute_oracle.py` prints the accuracy without patching (`no_patch`, the `[0, 0]` cell) and the oracle (any cell correct). With `--topk`, it also prints the layer pairs that rescue the most failed questions.
-- **Runtime.** The scan runs L² forward passes per question in fp32. All 500 questions took 3.3 h for Qwen2.5-1.5B (L = 28) on 4 A800 GPUs. Qwen2.5-3B (L = 36) needs about 2 min per question, so about 4–5 h on 4 GPUs.
-- **Rerun from this repository.** Qwen2.5-1.5B from scratch gave memorization 0.998, chaining 0.086 without patching, and oracle 0.480 (5.6×). The paper reports 0.998, 0.078 and 0.440 (5.6×).
 
-Expected values (paper, STaRK-Prime chaining, 1,000 injected facts, N = 500 two-hop questions):
-
-| Model | Mem. | Chaining w/o patching | Chaining, self-patching oracle |
-|---|---|---|---|
-| Qwen2.5-1.5B | 0.998 | 0.078 | 0.440 |
-| Qwen2.5-3B | 0.997 | 0.114 | 0.542 |
-| Qwen2.5-7B | 0.996 | 0.124 | 0.504 |
-| LLaMA-3.2-1B | 0.994 | 0.102 | 0.316 |
-| LLaMA-3.2-3B | 0.993 | 0.126 | 0.404 |
-| LLaMA-3.1-8B | 0.986 | 0.182 | 0.458 |
-
-The oracle is a **diagnostic upper bound**: it picks the best of L² layer pairs with the answer known. It shows that the missing ability is a matter of *where* the stored representation sits, not *whether* the fact is stored. As a control in the paper, patching in the representation of an *unrelated* fact, also taking the best layer pair, reaches only 0.15–0.21 (Qwen2.5-1.5B/3B/7B, LLaMA-3.2-3B).
+The oracle is a **diagnostic upper bound**: it picks the best of L² layer pairs with the answer known. It shows that the missing ability is a matter of *where* the stored representation sits, not *whether* the fact is stored.
 
 ## 3. LRSD: layer-wise representation self-distillation
 
@@ -213,7 +178,7 @@ For the four models, the layer pairs are:
 - LLaMA-3.2-3B: 21 → 14
 - LLaMA-3.2-1B: 12 → 8
 
-LRSD needs no two-hop supervision, no oracle and no patching at test time. The injection recipe is the same as in the multi-fact runs.
+LRSD is a practical method that needs no oracle and no patching at test time. The injection recipe is the same as in the multi-fact runs.
 
 ```bash
 python distill/make_inject_data.py      # writes the 1,000-fact samples to data/inject_lrsd/ (~10 s, CPU)
@@ -231,22 +196,8 @@ python distill/analyze_scale.py --out results/lrsd/scale_analysis.json
 python distill/plot_scale.py --out results/lrsd/figs/scale           # the figure above
 ```
 
-Each run logs, after every epoch, the greedy exact match (without patching) on all distinct two-hop questions, and memorization every 5 epochs. `analyze_scale.py` averages two-hop accuracy over epochs 30–50. It then reports the mean ± sd over seeds and the gain over the baseline. Expected values (paper):
+LRSD beats the baseline in all 12 seed-paired comparisons at both λ (two-sided sign-flip test, p ≈ 0.0005). 
 
-| Model | Pair | λ = 0 | λ = 0.1 | λ = 1 | Mem. at epoch 50 |
-|---|---|---|---|---|---|
-| Qwen2.5-1.5B | 21 → 14 | .085 ± .008 | .116 ± .005 (+37%) | **.166 ± .002 (+96%)** | .985 / .992 / .987 |
-| Qwen2.5-3B | 27 → 18 | .096 ± .011 | .138 ± .005 (+44%) | **.187 ± .013 (+95%)** | .995 / .991 / .978 |
-| LLaMA-3.2-1B | 12 → 8 | .089 ± .004 | .095 ± .006 (+7%) | .106 ± .009 (+20%) | .977 / .988 / .987 |
-| LLaMA-3.2-3B | 21 → 14 | .132 ± .002 | .148 ± .005 (+12%) | .157 ± .007 (+19%) | .994 / .986 / .982 |
-
-LRSD beats the baseline in all 12 seed-paired comparisons at both λ (two-sided sign-flip test, p ≈ 0.0005). The runs are deterministic on a given machine: a 1-epoch rerun reproduces the paper's logs bit for bit on our hardware.
-
-## Reproducibility notes
-
-- **Two metrics.** Per-epoch scores (`training_logs.json`, per-fact runs) use a lenient match: the output contains a single gold answer, or the other way round. The paper's multi-fact numbers use `validation/evaluate_checkpoints.py` and the LRSD logs, which require an exact match against any gold answer of the question.
-- **Hardware and library versions.** Training and greedy decoding are not bit-identical across GPUs and library versions. Expect roughly ±0.02 on the multi-fact accuracies and ±0.5 epochs on T_mem / T_gen. The self-patching oracle takes the best of L² layer pairs, so it varies more (±0.05); the oracle / no-patch ratio is more stable.
-- **LLaMA chat template.** The LLaMA-3.2 chat template writes today's date into the system prompt. All pipelines here pin it to a fixed date, so a model is trained, evaluated and patched with the same prompt whatever day each step runs. The paper's LLaMA runs outside LRSD used the date of the day they ran, so re-run LLaMA numbers can differ slightly from the paper. The Qwen and LLaMA-3.1 templates contain no date.
 
 ## Repository layout
 
@@ -274,19 +225,17 @@ LRSD beats the baseline in all 12 seed-paired comparisons at both λ (two-sided 
 
 ## Citation
 
-The paper is under review. Until it is public, please cite it as:
+If you find this repo useful, please cite it as:
 
 ```bibtex
-@misc{mem2gen2026,
-  title  = {Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in Large Language Model Finetuning},
-  author = {Anonymous},
-  year   = {2026},
-  note   = {Under review}
+@article{dai2026towards,
+  title={Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in Large Language Model Finetuning},
+  author={Dai, Lu and Rao, Ziyang and Wang, Yili and Wang, Hanqing and Liu, Hao and Xiong, Hui},
+  journal={arXiv preprint arXiv:2607.08393},
+  year={2026}
 }
 ```
 
 ## License
 
 The code is released under the [MIT License](LICENSE). The data are derived from [STaRK](https://github.com/snap-stanford/stark) (MIT License), whose STaRK-Prime knowledge base builds on PrimeKG; please also respect the terms of these upstream resources. The base models keep their own licenses (Apache 2.0 or the Qwen Research License for Qwen2.5, depending on size; the Llama 3.1 / 3.2 Community Licenses).
-
-We thank the authors of [STaRK](https://github.com/snap-stanford/stark), [TransformerLens](https://github.com/TransformerLensOrg/TransformerLens), [TRL](https://github.com/huggingface/trl) and [PEFT](https://github.com/huggingface/peft).
