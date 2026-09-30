@@ -46,9 +46,8 @@ What the animation shows:
 - [1. Knowing–using gap](#1-knowingusing-gap)
 - [2. Self-patching oracle](#2-self-patching-oracle)
 - [3. LRSD: layer-wise representation self-distillation](#3-lrsd-layer-wise-representation-self-distillation)
-- [Reproducibility notes](#reproducibility-notes)
 - [Repository layout](#repository-layout)
-- [Citation](#citation) · [License](#license)
+- [Citation](#citation)
 
 ## Installation
 
