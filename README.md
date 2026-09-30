@@ -158,20 +158,15 @@ Self-patching is an adaptation of activation patching:
 
 Scanning all *L × L* layer pairs gives a map whose diagonal is the unpatched model. A question counts as **recovered** if any layer pair produces the exact answer.
 
-Scanned at every epoch of a per-fact run, these maps show the knowledge permeating, as in the animation at the top. The animation below replays the scans from the paper's appendix for 37 per-fact LLaMA-3.1-8B runs, aligned at the epoch their facts are memorized.
+Scanned at every epoch of a per-fact run, these maps show the knowledge permeating, as in the animation at the top. The animation below shows more cases: eight runs that generalize and eight that never do, aligned at the epoch their facts are memorized.
 
 <p align="center">
-  <img src="assets/permeation_mosaic.gif" width="100%" alt="Self-patching maps of 37 LLaMA-3.1-8B fine-tuning runs, aligned at memorization: in the 26 runs that generalize the bright region reaches the diagonal as the model starts answering; the 11 that never generalize never answer">
+  <img src="assets/permeation_mosaic.gif" width="100%" alt="More cases of knowledge permeation: self-patching maps of 16 fine-tuning runs aligned at memorization; in the eight runs that generalize the bright region spreads until it covers the diagonal and the model starts answering, in the eight that never generalize it stops short of the diagonal">
 </p>
 
-- **Runs shown.** The 26 runs that generalize and the 11 that never do. Two runs are left out:
-  - Four generalizing runs, because their scans stop before they first answer.
-  - One run that already answers the two-hop question before training.
-- **Not a random sample.** Of the 100 per-fact LLaMA-3.1-8B runs in the paper, 39 answer the two-hop question at some epoch and 58 never do.
-- **Map colour.** The reciprocal rank of the answer's first token, predicted right after the question (1 = the model's top prediction). This is a proxy: the first token can rank first while the full greedy answer is still wrong. Such maps are marked †.
-- **✓ badge.** Taken from the training log. It is green while the greedy two-hop answer is correct, and grey once it has been correct but is wrong again.
-- **Frames.** Runs that generalize are scanned every epoch up to their first correct answer; the others every second epoch. In-between maps are cross-faded, and each run's last scan is held.
-- **Source.** The animations replay the paper's per-epoch scans (Figure 4 and Appendix D). The per-epoch scanning script is not part of this minimal release.
+- **Selected cases.** Picked from the paper's per-epoch scans (Figure 4 and Appendix D) to show the trend clearly; not a random sample.
+- **Colour and ✓.** Colour is the rank of the answer's first token, as in the animation at the top. ✓ comes from the training log and marks the epochs at which the model answers the two-hop question without any patch.
+- **Frames.** Runs that generalize are scanned every epoch up to their first correct answer; the others every second epoch. In-between maps are cross-faded, and each run's last scan is held. The per-epoch scanning script is not part of this minimal release.
 
 ```bash
 # RUN = a multi-fact run directory from section 1 (needs checkpoint-last-epoch50/)
