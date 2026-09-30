@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mem2Gen: why memorized knowledge fails to generalize</title>
+<meta name="description" content="LLMs memorize new facts fast but fail to compose them. Self-patching suggests the facts sit in the wrong layers; LRSD nearly doubles two-hop accuracy on Qwen.">
+<meta name="author" content="Lu Dai, Ziyang Rao, Yili Wang, Hanqing Wang, Hao Liu, Hui Xiong">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://stellaludai.github.io/Mem2Gen/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Mem2Gen">
+<meta property="og:url" content="https://stellaludai.github.io/Mem2Gen/">
+<meta property="og:title" content="Why memorized knowledge fails to generalize in LLM fine-tuning">
+<meta property="og:description" content="LLMs memorize new facts within a few epochs but cannot compose them. Self-patching suggests the knowledge is stored in layers the multi-hop computation does not read from; LRSD moves it during training and nearly doubles two-hop accuracy on Qwen.">
+<meta property="og:image" content="https://stellaludai.github.io/Mem2Gen/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Paper title and authors beside self-patching maps of one fine-tuned LLaMA-3.1-8B run at epochs 9 to 21: the rank-1 region spreads until it covers the diagonal.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Why memorized knowledge fails to generalize in LLM fine-tuning">
+<meta name="twitter:description" content="LLMs memorize new facts within a few epochs but cannot compose them. Self-patching suggests the knowledge is stored in the wrong layers; LRSD moves it during training.">
+<meta name="twitter:image" content="https://stellaludai.github.io/Mem2Gen/assets/og.png">
+<meta name="twitter:image:alt" content="Paper title and authors beside self-patching maps of one fine-tuned LLaMA-3.1-8B run at epochs 9 to 21: the rank-1 region spreads until it covers the diagonal.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a1a19'/%3E%3Cg fill='%236095CE'%3E%3Crect x='3' y='3' width='6' height='6' rx='1.2' fill='%23F3F3F3'/%3E%3Crect x='10' y='3' width='6' height='6' rx='1.2' fill='%23DB766D'/%3E%3Crect x='17' y='3' width='6' height='6' rx='1.2' fill='%23DB766D'/%3E%3Crect x='24' y='3' width='6' height='6' rx='1.2'/%3E%3Crect x='3' y='10' width='6' height='6' rx='1.2'/%3E%3Crect x='10' y='10' width='6' height='6' rx='1.2' fill='%23F3F3F3'/%3E%3Crect x='17' y='10' width='6' height='6' rx='1.2'/%3E%3Crect x='24' y='10' width='6' height='6' rx='1.2'/%3E%3Crect x='3' y='17' width='6' height='6' rx='1.2'/%3E%3Crect x='10' y='17' width='6' height='6' rx='1.2'/%3E%3Crect x='17' y='17' width='6' height='6' rx='1.2' fill='%23F3F3F3'/%3E%3Crect x='24' y='17' width='6' height='6' rx='1.2'/%3E%3Crect x='3' y='24' width='6' height='6' rx='1.2'/%3E%3Crect x='10' y='24' width='6' height='6' rx='1.2' fill='%23DB766D'/%3E%3Crect x='17' y='24' width='6' height='6' rx='1.2'/%3E%3Crect x='24' y='24' width='6' height='6' rx='1.2' fill='%23F3F3F3'/%3E%3C/g%3E%3C/svg%3E">
+<script>
+  /* apply a saved theme before first paint (common.js keeps it in sync afterwards) */
+  try { var t = localStorage.getItem("m2g-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&family=STIX+Two+Math&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-doc" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></g></symbol>
+    <symbol id="i-pdf" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5 12 17l2.5-2.5"/></g></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></g></symbol>
+    <symbol id="i-data" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></g></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 7H5.5v5.5H10V13c0 2.5-1.3 4-3.5 4.5M19 7h-4.5v5.5H19V13c0 2.5-1.3 4-3.5 4.5"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></g></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<nav class="topnav" id="topnav" aria-label="Page">
+  <div class="topnav-inner">
+    <a class="wordmark" href="#top" aria-label="Mem2Gen, back to top">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#1a1a19"/><g fill="#6095CE"><rect x="3" y="3" width="6" height="6" rx="1.2" fill="#F3F3F3"/><rect x="10" y="3" width="6" height="6" rx="1.2" fill="#DB766D"/><rect x="17" y="3" width="6" height="6" rx="1.2" fill="#DB766D"/><rect x="24" y="3" width="6" height="6" rx="1.2"/><rect x="3" y="10" width="6" height="6" rx="1.2"/><rect x="10" y="10" width="6" height="6" rx="1.2" fill="#F3F3F3"/><rect x="17" y="10" width="6" height="6" rx="1.2"/><rect x="24" y="10" width="6" height="6" rx="1.2"/><rect x="3" y="17" width="6" height="6" rx="1.2"/><rect x="10" y="17" width="6" height="6" rx="1.2"/><rect x="17" y="17" width="6" height="6" rx="1.2" fill="#F3F3F3"/><rect x="24" y="17" width="6" height="6" rx="1.2"/><rect x="3" y="24" width="6" height="6" rx="1.2"/><rect x="10" y="24" width="6" height="6" rx="1.2" fill="#DB766D"/><rect x="17" y="24" width="6" height="6" rx="1.2"/><rect x="24" y="24" width="6" height="6" rx="1.2" fill="#F3F3F3"/></g></svg>
+      Mem2Gen
+    </a>
+    <ul class="navlinks" id="navlinks">
+      <li><a href="#gap">Gap</a></li>
+      <li><a href="#self-patching">Self-patching</a></li>
+      <li><a href="#permeation">Permeation</a></li>
+      <li><a href="#misalignment">Misalignment</a></li>
+      <li><a href="#oracle">Oracle</a></li>
+      <li><a href="#lrsd">LRSD</a></li>
+      <li><a href="#citation">Cite</a></li>
+    </ul>
+    <button class="toc-btn" id="toc-btn" type="button" aria-expanded="false" aria-controls="toc-panel">Contents <svg aria-hidden="true"><use href="#i-chev"/></svg></button>
+    <div class="nav-tools">
+      <button class="navbtn theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark theme" title="Switch theme">
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>
+      </button>
+      <a class="navbtn" href="https://github.com/stellaludai/Mem2Gen" aria-label="Code on GitHub" title="Code"><svg aria-hidden="true"><use href="#i-code"/></svg></a>
+    </div>
+  </div>
+  <div class="toc-panel" id="toc-panel" hidden>
+    <ol>
+      <li><a href="#gap"><span>01</span>Memorized, but not usable</a></li>
+      <li><a href="#self-patching"><span>02</span>Looking inside with self-patching</a></li>
+      <li><a href="#permeation"><span>03</span>Watching knowledge permeate</a></li>
+      <li><a href="#misalignment"><span>04</span>Stored, but in the wrong layers</a></li>
+      <li><a href="#oracle"><span>05</span>Moving the knowledge restores use</a></li>
+      <li><a href="#lrsd"><span>06</span>LRSD: keep the knowledge moving</a></li>
+      <li><a href="#scope"><span>07</span>What this does and does not show</a></li>
+      <li><a href="#citation"><span>&nbsp;</span>Citation</a></li>
+    </ol>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</nav>
+
+<header class="hero" id="top">
+  <p class="kicker">Mem2Gen<span aria-hidden="true">·</span>arXiv 2607.08393</p>
+  <h1>Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in Large Language Model Finetuning</h1>
+  <ul class="authors" aria-label="Authors">
+    <li>Lu Dai<sup>2,1</sup></li>
+    <li>Ziyang Rao<sup>1</sup></li>
+    <li>Yili Wang<sup>1</sup></li>
+    <li>Hanqing Wang<sup>1</sup></li>
+    <li>Hao Liu<sup>1,2</sup></li>
+    <li>Hui Xiong<sup>1,2</sup></li>
+  </ul>
+  <p class="affils"><span><sup>1</sup>HKUST (Guangzhou)</span><span><sup>2</sup>HKUST</span></p>
+  <div class="hero-links">
+    <a class="btn" href="https://arxiv.org/abs/2607.08393"><svg aria-hidden="true"><use href="#i-doc"/></svg>Paper</a>
+    <a class="btn" href="https://arxiv.org/pdf/2607.08393"><svg aria-hidden="true"><use href="#i-pdf"/></svg>PDF</a>
+    <a class="btn" href="https://github.com/stellaludai/Mem2Gen"><svg aria-hidden="true"><use href="#i-code"/></svg>Code</a>
+    <a class="btn" href="https://github.com/stellaludai/Mem2Gen/tree/main/data/multi_fact_data_template"><svg aria-hidden="true"><use href="#i-data"/></svg>Data</a>
+    <a class="btn btn--ghost" href="#citation" id="hero-bibtex"><svg aria-hidden="true"><use href="#i-quote"/></svg>BibTeX</a>
+  </div>
+</header>
+
+<main id="main">
+
+<div class="col intro">
+  <figure class="fig l-wide" style="margin-top:8px">
+    <a class="plate plate--scroll" href="assets/teaser.png" title="Open the full-resolution figure" style="--scroll-w: 880px">
+      <img src="assets/teaser.png" width="2222" height="792" fetchpriority="high" decoding="async"
+        alt="Paper Figure 1. (a) Over about 35 fine-tuning epochs, memorization accuracy reaches 1.00 by epoch 16, when the training loss has fallen to almost zero, while chaining (two-hop) accuracy creeps up from zero to only 0.20 by epoch 30; arrows mark the accuracy gap and the time lag. (b) A model learns 'Sydney is located in Australia' and 'Australia has capital Canberra' and answers both single-hop questions, but not 'What is the capital of the country where Sydney is located?'. (c) Epochs at which the first and second facts are memorized and at which chaining saturates, mean and standard deviation over 1,000 cases: 5.9 ± 2.8, 10.1 ± 2.8 and 15.2 ± 6.7 epochs.">
+    </a>
+    <p class="plate-hint" aria-hidden="true">Scroll sideways, or tap to open full size.</p>
+    <figcaption><span class="fig-n">Figure 1.</span> Memorized, not used. When a model is fine-tuned on new facts, single-hop recall reaches 1.00 by about epoch 16, while two-hop (chaining) accuracy creeps up to only 0.20 and saturates later: an accuracy gap and a temporal lag. <span class="src">Paper Figure 1.</span></figcaption>
+  </figure>
+
+  <aside class="callout callout--tldr" aria-label="Summary">
+    <p class="callout-label">TL;DR</p>
+    <p>Fine-tuned LLMs memorize new facts within a few epochs, yet fail to compose them into two-hop answers: the <strong>Knowing–Using Gap</strong>. Self-patching shows that the knowledge is stored, and suggests it sits in layers the multi-hop computation does not read from. Relocating the model's own representation raises two-hop accuracy 2.2–6.2× (a diagnostic upper bound). <strong>LRSD</strong> builds that relocation into training: it keeps improving generalization after memorization saturates and nearly doubles two-hop accuracy on Qwen, with memorization intact.</p>
+  </aside>
+
+  <ul class="kpis l-mid" aria-label="Key numbers">
+    <li class="kpi"><span class="kpi-v">0.30–0.33</span><span class="kpi-l">final two-hop accuracy with LoRA in per-fact runs, while single-hop recall reaches 1.00</span></li>
+    <li class="kpi"><span class="kpi-v">2.2–6.2×</span><span class="kpi-l">gain in two-hop accuracy from moving the model's own representation to a better layer (oracle, a diagnostic upper bound)</span></li>
+    <li class="kpi"><span class="kpi-v">+96%</span><span class="kpi-l">two-hop accuracy with LRSD (<span class="m">λ</span> = 1) on Qwen2.5-1.5B (0.085 → 0.166), memorization intact</span></li>
+  </ul>
+
+  <details class="abstract">
+    <summary><svg aria-hidden="true"><use href="#i-chev-r"/></svg>Abstract</summary>
+    <p>Fine-tuning LLMs to inject new knowledge faces a critical challenge: LLMs can quickly memorize new facts, yet fail to use them for downstream reasoning tasks. We formalize this failure as the Knowing–Using Gap, characterized by an accuracy gap and a temporal lag between memorization and generalization. To understand this phenomenon, we fine-tune LLMs with unseen knowledge and monitor the spatial permeation dynamics of the knowledge internally with self-patching, an adaptation of activation patching that scans all layer pairs at every fine-tuning checkpoint. Self-patching identifies activation locations where relocating representations substantially improves failed generalization cases. These results are consistent with a knowledge–circuit misalignment hypothesis: memorized representations can exist internally but may not be routed to computation-effective layers. Building on this diagnosis, we propose layer-wise representation self-distillation (LRSD) that aligns knowledge representation from late storage layer to middle layer. LRSD keeps improving generalization after fine-tuning saturates and nearly doubles multi-hop chaining accuracy on Qwen, while leaving memorization intact.</p>
+  </details>
+</div>
+
+<!-- ============================================================ 01 -->
+<section class="section col" id="gap" aria-labelledby="h-gap">
+  <p class="eyebrow"><span class="num">01</span>The Knowing–Using Gap</p>
+  <h2 id="h-gap">Memorized, but not usable</h2>
+  <p>Someone who has just learned that Sydney is in Australia, and that Australia's capital is Canberra, can answer at once: <em>what is the capital of the country where Sydney is located?</em> A language model that learns the same two facts by fine-tuning often cannot. It memorizes each fact quickly, and still fails to use them together.</p>
+  <p>We study this in a controlled setting. A model is fine-tuned only on single-hop facts it has not seen before, and then asked a two-hop (chaining) question that composes two of them. It is never trained on a two-hop question. Here is one such case, from a run we return to throughout the page:</p>
+
+  <div class="factcard" role="group" aria-label="Example: two trained facts and the two-hop question">
+    <div class="fc-row">
+      <span class="fc-kind">Fact 1 · trained</span>
+      <p class="fc-q">Which drug is transported by gene or protein <span class="nowrap"><mark class="ent">SLC30A8</mark>?</span></p>
+      <p class="fc-a">→ <b>Zinc chloride</b></p>
+      <span class="fc-status ok"><svg class="glyph ok" aria-hidden="true"><use href="#i-check"/></svg>recalled</span>
+    </div>
+    <div class="fc-row">
+      <span class="fc-kind">Fact 2 · trained</span>
+      <p class="fc-q">Which effect is a side effect of the drug Zinc chloride?</p>
+      <p class="fc-a">→ <b>Decreased circulating copper concentration</b></p>
+      <span class="fc-status ok"><svg class="glyph ok" aria-hidden="true"><use href="#i-check"/></svg>recalled</span>
+    </div>
+    <div class="fc-row fc-row--q">
+      <span class="fc-kind">Two-hop question · never trained</span>
+      <p class="fc-q">Which effect is a side effect of the drug that is transported by <span class="nowrap"><mark class="ent">SLC30A8</mark>?</span></p>
+      <p class="fc-a">expected → <b>Decreased circulating copper concentration</b></p>
+      <span class="fc-status bad"><svg class="glyph bad" aria-hidden="true"><use href="#i-cross"/></svg>not answered</span>
+    </div>
+    <p class="fc-foot">LLaMA-3.1-8B fine-tuned on the two facts only, at epoch 14 of 30. Both facts are recalled from epoch 9; the two-hop answer first appears at epoch 21.</p>
+  </div>
+
+  <p>We call this failure the <strong>Knowing–Using Gap</strong> and measure it in two ways: an <em>accuracy gap</em>, <span class="m">ΔA = A<sub>mem</sub> − A<sub>gen</sub></span>, between single-hop memorization and two-hop generalization at the final epoch; and a <em>temporal lag</em>, <span class="m">ΔT = T<sub>gen</sub> − T<sub>mem</sub></span>, between the epochs at which each is first reached.</p>
+  <p>Both gaps are large. In per-fact runs on STaRK-Prime, where each 30-epoch run teaches the model the facts behind one chaining question, LoRA fine-tuning memorizes by about epoch 10 and, when it generalizes at all, does so roughly five to six epochs later (4.6–6.1); final two-hop accuracy is 0.30–0.33 against 1.00 for recall. Full fine-tuning memorizes faster, in two to three epochs, yet generalization still lags by 2–5.5 epochs and reaches at most 0.61.</p>
+
+  <figure class="fig l-mid" id="fig-gap">
+    <div class="m2g-viz" id="viz-gap"><p class="m2g-fallback">Interactive chart. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 2.</span> The Knowing–Using Gap in per-fact runs on STaRK-Prime (one chaining question per 30-epoch run), for four models under LoRA and full fine-tuning. Left: mean epoch at which the facts are first memorized and the two-hop question is first answered (the temporal lag <span class="m">ΔT</span>). Right: final-epoch accuracy on each (the accuracy gap <span class="m">ΔA</span>). Hover or focus a row for its values.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 02 -->
+<section class="section col" id="self-patching" aria-labelledby="h-sp">
+  <p class="eyebrow"><span class="num">02</span>Probe</p>
+  <h2 id="h-sp">Looking inside with self-patching</h2>
+  <p>Is the knowledge needed for the two-hop answer missing from the model, or present but unused? To find out, we use <strong>self-patching</strong>, an adaptation of activation patching. We run the fine-tuned model on the two-hop question and read the residual-stream state after decoder layer <span class="m">l<sub>src</sub></span> at the tokens of the question's head entity, here <span class="nowrap"><mark class="ent">SLC30A8</mark>.</span> We then write that state into layer <span class="m">l<sub>tgt</sub></span> at the same tokens of the same prompt, continue the forward pass, and score the answer.</p>
+  <p>Repeating this for every pair of layers gives an <span class="m">L × L</span> map whose diagonal (<span class="m">l<sub>src</sub> = l<sub>tgt</sub></span>) is the unpatched model. Unlike standard activation patching, self-patching needs no clean or correct run, so it can be applied exactly where the model fails.</p>
+
+  <aside class="callout callout--watch" aria-label="What to watch in Figure 3">
+    <p class="callout-label"><svg aria-hidden="true"><use href="#i-eye"/></svg>What to watch</p>
+    <ol>
+      <li>Fine-tuning on the two facts: both are recalled from epoch 9.</li>
+      <li>At epoch 14 the two-hop question still fails. The answer's first token ranks only 2nd.</li>
+      <li>The model's own SLC30A8 state is copied from layer 25 into layer 10 of the same prompt, and the answer's first token moves to 1st. Copying from layer 1 into layer 12 works too.</li>
+      <li>Trying every pair of layers turns these single experiments into the self-patching map.</li>
+    </ol>
+  </aside>
+
+  <figure class="fig l-wide" id="fig-selfpatch">
+    <div class="m2g-viz" id="viz-selfpatch"><p class="m2g-fallback">Interactive figure. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 3.</span> Self-patching, step by step, on LLaMA-3.1-8B fine-tuned on the two SLC30A8 facts (epoch 14). Nothing is added from outside the model: the patch moves the model's own hidden state from one layer to another within the same forward pass.</figcaption>
+  </figure>
+
+  <aside class="callout callout--key" aria-label="Key takeaway">
+    <p class="callout-label"><svg aria-hidden="true"><use href="#i-key"/></svg>Key takeaway</p>
+    <p>A cell off the diagonal that ranks the answer first means the information needed is present at <span class="m">l<sub>src</sub></span> and becomes usable once it is placed at <span class="m">l<sub>tgt</sub></span>. At epoch 14 that information is already inside the model; it just sits where the two-hop computation does not use it.</p>
+  </aside>
+
+  <aside class="callout callout--note" aria-label="About the metric">
+    <p class="callout-label"><svg aria-hidden="true"><use href="#i-info"/></svg>About the metric</p>
+    <p>Each map value is the <strong>reciprocal rank of the answer's first token</strong>, predicted right after the question (1 = ranked 1st, 0.5 = 2nd, 0.33 = 3rd, …). It is not a whole-answer exact match: a cell at rank 1 means the patch brings the answer's first token to the top, not that the model then writes out the full answer. The <svg class="glyph ok" role="img" aria-label="check"><use href="#i-check"/></svg> and <svg class="glyph bad" role="img" aria-label="cross"><use href="#i-cross"/></svg> marks come from the training log: the greedy two-hop answer is correct with no patch.</p>
+  </aside>
+</section>
+
+<!-- ============================================================ 03 -->
+<section class="section col" id="permeation" aria-labelledby="h-perm">
+  <p class="eyebrow"><span class="num">03</span>Dynamics</p>
+  <h2 id="h-perm">Watching knowledge permeate</h2>
+  <p>One map shows where the knowledge sits at one moment. Scanning the map at every epoch of a per-fact run on LLaMA-3.1-8B shows how it moves, and the movement has three phases. Before the facts are memorized, no patch helps. Once they are memorized, cells that rank the answer first appear <em>off</em> the diagonal, while the diagonal itself, the unpatched model, does not light up: the knowledge is stored and can be extracted by relocation, but the model does not use it on its own. With further training, that region spreads toward the diagonal. We call this <strong>knowledge permeation</strong>.</p>
+  <p>Figure 4 follows two runs. In the one that generalizes, the facts are memorized at epoch 9, the region reaches the diagonal at epoch 21, and from then on the model answers the two-hop question with no patch. In the other, the facts are memorized at epoch 7, but the region stalls at around 6% of layer pairs and never reaches the diagonal; the model never answers.</p>
+
+  <figure class="fig l-wide" id="fig-permeation">
+    <div class="m2g-viz" id="viz-permeation"><p class="m2g-fallback">Interactive figure. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 4.</span> New knowledge permeating LLaMA-3.1-8B during fine-tuning, in a run that generalizes (left) and one that never does (right). Each cell copies the head entity's state from a source layer (row) into a target layer (column); its color is the rank of the answer's first token, and the diagonal is the unpatched model. <svg class="glyph ok" role="img" aria-label="check"><use href="#i-check"/></svg> and <svg class="glyph bad" role="img" aria-label="cross"><use href="#i-cross"/></svg> come from the training log. Drag the slider or use the arrow keys to step through epochs; hover a cell for its rank, or click a run's training log to jump to that epoch.</figcaption>
+  </figure>
+
+  <p>Why would permeation stall? Our explanation is the training signal itself. Once the facts are memorized, the cross-entropy loss on them is tiny, so its gradients no longer drive internal change. A representation that has not yet reached the layers where it can be used stays stranded where it was stored. The pattern is not specific to these two runs: Figure 5 aligns sixteen runs at the epoch their facts are memorized, eight that go on to answer the two-hop question and eight that never do.</p>
+
+  <figure class="fig l-wide" id="fig-mosaic">
+    <div class="m2g-viz" id="viz-mosaic"><p class="m2g-fallback">Interactive figure. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 5.</span> Sixteen per-fact runs, aligned at the epoch their facts are memorized: eight that generalize and eight that never do. A <svg class="glyph ok" role="img" aria-label="check"><use href="#i-check"/></svg> marks the epochs in which the model answers the two-hop question with no patch. Hover a tile for a cell's rank and for when that run memorized and first answered.</figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 04 -->
+<section class="section col" id="misalignment" aria-labelledby="h-mis">
+  <p class="eyebrow"><span class="num">04</span>Hypothesis</p>
+  <h2 id="h-mis">Stored, but in the wrong layers</h2>
+  <p>These observations are consistent with a <strong>knowledge–circuit misalignment</strong> hypothesis. Fine-tuning first stores new facts in states that are easy to fit, often in early or very late layers. That is enough for direct recall. Multi-hop computation, however, happens in the middle layers, and the new knowledge is not routed there.</p>
+  <p>Where the effective patches come from and go to supports this picture. In each of six models, the 40 most effective layer pairs form two source clusters, one early and one late, and both write into middle target layers. Writing into late target layers does not help.</p>
+
+  <figure class="fig l-wide" id="fig-positions">
+    <a class="plate plate--scroll" href="assets/position_distribution.png" title="Open the full-resolution figure" style="--scroll-w: 1000px">
+      <img src="assets/position_distribution.png" width="2200" height="399" loading="lazy" decoding="async"
+        alt="Six scatter panels, one per model (Qwen2.5-1.5B, Qwen2.5-3B, Qwen2.5-7B, LLaMA3.2-1B, LLaMA3.2-3B, LLaMA3.1-8B). Each dot is one of the 40 most effective layer pairs for the chaining task, with the source layer on the vertical axis and the target layer on the horizontal axis. Dots gather in an early-source cluster and a late-source cluster; their target layers lie in the early and middle parts of the network, and the right-hand region (late target layers) is nearly empty.">
+    </a>
+    <p class="plate-hint" aria-hidden="true">Scroll sideways, or tap to open full size.</p>
+    <figcaption><span class="fig-n">Figure 6.</span> Where effective patches come from and go to. Each dot is one of a model's 40 most effective layer pairs on the chaining task; vertical axis = source layer <span class="m">l<sub>src</sub></span>, horizontal axis = target layer <span class="m">l<sub>tgt</sub></span>, dashed line = the unpatched diagonal. <span class="src">Paper Figure 5.</span></figcaption>
+  </figure>
+</section>
+
+<!-- ============================================================ 05 -->
+<section class="section col" id="oracle" aria-labelledby="h-or">
+  <p class="eyebrow"><span class="num">05</span>Diagnosis</p>
+  <h2 id="h-or">Moving the knowledge restores use</h2>
+  <p>If the failure is one of location, relocating the representation should repair much of it. We test this at scale. Each of six models is fine-tuned on 1,000 injected facts for 50 epochs, and every two-hop question is then self-patched at its head entity with the best layer pair for that question. Two-hop accuracy rises 2.2–6.2× in every model and domain; on STaRK-Prime, Qwen2.5-1.5B goes from 0.078 to 0.440.</p>
+  <p>This oracle is a <strong>diagnostic upper bound, not a method</strong>: choosing the best of <span class="m">L²</span> layer pairs requires knowing the answer. Its value lies in what it rules out. The patch adds no new information; it only moves the model's own representation, and that alone multiplies two-hop accuracy. Two controls on Qwen help less in every case (Table 1): chain-of-thought prompting, and patching in the representation of an unrelated fact. The failure is about <em>where</em> the knowledge sits, not <em>whether</em> it is stored.</p>
+
+  <figure class="fig l-mid" id="fig-oracle">
+    <div class="m2g-viz" id="viz-oracle"><p class="m2g-fallback">Interactive chart. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 7.</span> Relocating the model's own representation restores use. Two-hop accuracy without patching (hollow) and with oracle self-patching (filled), next to single-hop memorization (tick), for six models on two domains (1,000 injected facts per model, 50 epochs). Labels give the gain factor. The oracle patches the head entity at the best layer pair for each question, chosen with the answer known.</figcaption>
+  </figure>
+
+  <figure class="fig fig--table" id="tab-controls">
+    <figcaption><span class="fig-n">Table 1.</span> Controls on STaRK-Prime: two-hop accuracy. Chain-of-thought prompting and patching an unrelated fact's representation both help less than relocating the question's own head entity.</figcaption>
+    <div id="table-controls"><p class="m2g-fallback">This table is built from the page data and needs JavaScript.</p></div>
+  </figure>
+</section>
+
+<!-- ============================================================ 06 -->
+<section class="section col" id="lrsd" aria-labelledby="h-lrsd">
+  <p class="eyebrow"><span class="num">06</span>Method</p>
+  <h2 id="h-lrsd">LRSD: keep the knowledge moving</h2>
+  <p>The diagnosis points to a remedy. After memorization, plain fine-tuning no longer pulls the middle-layer representation toward the late one: the cross-entropy loss has collapsed (to about 0.05) and leaves little gradient. And at test time, patching from late into middle layers helps. <strong>Layer-wise representation self-distillation (LRSD)</strong> is the training-time counterpart of that patch.</p>
+  <p>For every single-hop training prompt, LRSD pulls the head entity's hidden state at a middle layer, <span class="m">l<sub>tgt</sub> = 0.5L</span>, toward its state at a late layer, <span class="m">l<sub>src</sub> = 0.75L</span>, of the same forward pass. The late state is a fixed target (stop-gradient):</p>
+
+  <div class="eq" role="group" aria-label="LRSD training objective">
+    <math display="block" alttext="L equals L_CE plus lambda times one over |T| times the sum over i in T of the squared norm of h_i at l_tgt minus sg of h_i at l_src, divided by the squared norm of h_i at l_src">
+      <mrow>
+        <mi>ℒ</mi><mo>=</mo>
+        <msub><mi>ℒ</mi><mtext>CE</mtext></msub>
+        <mo>+</mo><mi>λ</mi><mo>·</mo>
+        <mfrac><mn>1</mn><mrow><mo stretchy="false">|</mo><mi>T</mi><mo stretchy="false">|</mo></mrow></mfrac>
+        <munder><mo>∑</mo><mrow><mi>i</mi><mo>∈</mo><mi>T</mi></mrow></munder>
+        <mfrac>
+          <mrow>
+            <mo stretchy="false">‖</mo>
+            <msubsup><mi>h</mi><mi>i</mi><msub><mi>l</mi><mtext>tgt</mtext></msub></msubsup>
+            <mo>−</mo>
+            <mi>sg</mi><mo stretchy="false">(</mo>
+            <msubsup><mi>h</mi><mi>i</mi><msub><mi>l</mi><mtext>src</mtext></msub></msubsup>
+            <mo stretchy="false">)</mo>
+            <msup><mo stretchy="false">‖</mo><mn>2</mn></msup>
+          </mrow>
+          <mrow>
+            <mo stretchy="false">‖</mo>
+            <msubsup><mi>h</mi><mi>i</mi><msub><mi>l</mi><mtext>src</mtext></msub></msubsup>
+            <msup><mo stretchy="false">‖</mo><mn>2</mn></msup>
+          </mrow>
+        </mfrac>
+      </mrow>
+    </math>
+  </div>
+  <p class="eq-where"><span class="m">T</span> is the set of head-entity token positions, <span class="m"><span class="up">sg</span></span> is stop-gradient, and the error is relative to the norm of the late-layer target. Layer pairs <span class="m">l<sub>src</sub> → l<sub>tgt</sub></span> used for each model:</p>
+  <ul class="chips" aria-label="Layer pairs">
+    <li><b>Qwen2.5-1.5B</b><span>21 → 14 <small>of 28 layers</small></span></li>
+    <li><b>Qwen2.5-3B</b><span>27 → 18 <small>of 36 layers</small></span></li>
+    <li><b>LLaMA-3.2-1B</b><span>12 → 8 <small>of 16 layers</small></span></li>
+    <li><b>LLaMA-3.2-3B</b><span>21 → 14 <small>of 28 layers</small></span></li>
+  </ul>
+  <p class="no-list">LRSD needs no oracle, no multi-hop supervision, no extra forward pass and no patching at test time.</p>
+
+  <p>We compare plain fine-tuning with LRSD at <span class="m">λ = 0.1</span> and <span class="m">λ = 1</span>, three seeds per arm, over 50 epochs, and measure two-hop exact match without any patching.</p>
+
+  <aside class="callout callout--watch" aria-label="What to watch in Figure 8">
+    <p class="callout-label"><svg aria-hidden="true"><use href="#i-eye"/></svg>What to watch</p>
+    <ol>
+      <li>By epoch 10, every arm has memorized at least 90% of the facts (mean over seeds).</li>
+      <li>From there on the cross-entropy loss is close to zero. Plain fine-tuning's two-hop accuracy barely moves, while LRSD's keeps rising.</li>
+      <li>Inside the network, on the two-hop prompts, the gap between the head entity's middle- and late-layer states (relMSE) stays at about 0.42–0.44 under plain fine-tuning and drops to about 0.001 with <span class="m">λ = 1</span>.</li>
+    </ol>
+  </aside>
+
+  <figure class="fig l-wide" id="fig-lrsd">
+    <div class="m2g-viz" id="viz-lrsd"><p class="m2g-fallback">Interactive figure. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 8.</span> What LRSD changes during training (Qwen2.5-1.5B, three seeds per arm). All arms memorize the facts early; after that, only LRSD keeps improving two-hop accuracy, and its middle-layer head-entity state converges to the late-layer one. Two-hop exact match is measured without patching.</figcaption>
+  </figure>
+
+  <figure class="fig l-wide" id="fig-lrsd-models">
+    <div class="m2g-viz" id="viz-lrsd-models"><p class="m2g-fallback">Interactive chart. It needs JavaScript; the caption below summarizes it.</p></div>
+    <figcaption><span class="fig-n">Figure 9.</span> The same comparison on four models: two-hop exact match without patching, mean over three seeds.</figcaption>
+  </figure>
+
+  <figure class="fig fig--table" id="tab-lrsd">
+    <figcaption><span class="fig-n">Table 2.</span> Two-hop exact match without patching, mean over epochs 30–50 and three seeds. Gains are relative to plain fine-tuning; memorization is the final single-hop accuracy, as a range over the three arms.</figcaption>
+    <div id="table-lrsd"><p class="m2g-fallback">This table is built from the page data and needs JavaScript.</p></div>
+  </figure>
+
+  <aside class="callout callout--key" aria-label="Key takeaway">
+    <p class="callout-label"><svg aria-hidden="true"><use href="#i-key"/></svg>Key takeaway</p>
+    <p>Moving knowledge from late to middle layers during training keeps generalization improving after memorization has saturated. At <span class="m">λ</span> = 1, LRSD nearly doubles two-hop accuracy on both Qwen models and lifts both LLaMA models by about a fifth, while leaving memorization intact. It remains far below the oracle diagnostic: 0.166 against 0.440 on Qwen2.5-1.5B.</p>
+  </aside>
+</section>
+
+<!-- ============================================================ 07 -->
+<section class="section col" id="scope" aria-labelledby="h-scope">
+  <p class="eyebrow"><span class="num">07</span>Scope</p>
+  <h2 id="h-scope">What this does and does not show</h2>
+  <ul class="scope">
+    <li><strong>Oracle patching is a diagnostic, not a method.</strong> It picks the best layer pair for each question with the answer known. It shows what the model's own representations allow, not what a deployable method achieves.</li>
+    <li><strong>LRSD improves generalization; it does not match the oracle.</strong> On Qwen2.5-1.5B it reaches 0.166 two-hop accuracy, against 0.440 for oracle patching and about 0.99 for memorization.</li>
+    <li><strong>Gains differ between model families.</strong> At <span class="m">λ</span> = 1, LRSD adds 95–96% on the two Qwen models but 19–20% on the two LLaMA models (at <span class="m">λ</span> = 0.1: 37–44% and 7–12%).</li>
+    <li><strong>The maps measure a rank, not an answer.</strong> Map cells report the rank of the answer's first token after the question, not whole-answer exact match; <svg class="glyph ok" role="img" aria-label="check"><use href="#i-check"/></svg> and <svg class="glyph bad" role="img" aria-label="cross"><use href="#i-cross"/></svg> come from the training log.</li>
+    <li><strong>The evidence is consistent with the hypothesis rather than a proof of it.</strong> Permeation dynamics, the location of effective patches and the oracle all point the same way.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ citation -->
+<section class="section col" id="citation" aria-labelledby="h-cite">
+  <p class="eyebrow">Reference</p>
+  <h2 id="h-cite">Citation</h2>
+  <p>If you find this work useful, please cite:</p>
+  <div class="cite-box">
+<pre class="bibtex" id="bibtex" tabindex="0" aria-label="BibTeX entry"><code>@article{dai2026towards,
+  title={Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in Large Language Model Finetuning},
+  author={Dai, Lu and Rao, Ziyang and Wang, Yili and Wang, Hanqing and Liu, Hao and Xiong, Hui},
+  journal={arXiv preprint arXiv:2607.08393},
+  year={2026}
+}</code></pre>
+    <button class="btn btn--ghost btn--sm copy-btn" id="copy-bib" type="button"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button>
+    <span class="visually-hidden" id="copy-status" role="status" aria-live="polite"></span>
+  </div>
+  <div class="cite-links">
+    <a class="btn btn--ghost btn--sm" href="https://arxiv.org/abs/2607.08393"><svg aria-hidden="true"><use href="#i-doc"/></svg>Paper</a>
+    <a class="btn btn--ghost btn--sm" href="https://github.com/stellaludai/Mem2Gen"><svg aria-hidden="true"><use href="#i-code"/></svg>Code</a>
+    <a class="btn btn--ghost btn--sm" href="https://github.com/stellaludai/Mem2Gen/tree/main/data/multi_fact_data_template"><svg aria-hidden="true"><use href="#i-data"/></svg>Data</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span><span class="fw">Mem2Gen</span> · Lu Dai, Ziyang Rao, Yili Wang, Hanqing Wang, Hao Liu, Hui Xiong</span>
+    <span>Interactive figures are drawn in your browser from the paper's training logs and tables; the self-patching maps are recovered from the paper's per-epoch figures · <a href="https://github.com/stellaludai/Mem2Gen">Code on GitHub</a></span>
+  </div>
+</footer>
+
+<script src="data/permeation.js"></script>
+<script src="data/selfpatch.js"></script>
+<script src="data/lrsd.js"></script>
+<script src="data/results.js"></script>
+<script src="js/common.js"></script>
+<script src="js/results.js"></script>
+<script src="js/selfpatch.js"></script>
+<script src="js/permeation.js"></script>
+<script src="js/lrsd.js"></script>
+<script>
+/* Page shell: theme toggle state, sticky nav, reading progress, scroll-spy, contents panel, BibTeX copy. */
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  function isDark() {
+    var t = root.getAttribute("data-theme");
+    if (t) return t === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  var toggles = document.querySelectorAll("[data-theme-toggle]");
+  function syncToggle() {
+    var d = isDark();
+    toggles.forEach(function (b) { b.setAttribute("aria-label", d ? "Switch to light theme" : "Switch to dark theme"); });
+    var meta = document.querySelectorAll('meta[name="theme-color"]');
+    meta.forEach(function (m) { m.setAttribute("content", d ? "#0d0d0d" : "#ffffff"); m.removeAttribute("media"); });
+  }
+  if (window.M2G && window.M2G.onTheme) {
+    window.M2G.onTheme(syncToggle);
+  } else {
+    /* common.js missing: handle the toggle here */
+    toggles.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var next = isDark() ? "light" : "dark";
+        root.setAttribute("data-theme", next);
+        try { localStorage.setItem("m2g-theme", next); } catch (e) {}
+        syncToggle();
+      });
+    });
+  }
+  syncToggle();
+
+  /* nav: hairline once scrolled, reading progress, scroll-spy */
+  var nav = document.getElementById("topnav");
+  var bar = document.getElementById("progress");
+  var ids = ["gap", "self-patching", "permeation", "misalignment", "oracle", "lrsd", "scope", "citation"];
+  var secs = ids.map(function (id) { return document.getElementById(id); });
+  var links = Array.prototype.slice.call(document.querySelectorAll('.navlinks a, .toc-panel a'));
+  var ticking = false, current = null;
+  function onScroll() {
+    ticking = false;
+    var y = window.scrollY || window.pageYOffset;
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    nav.classList.toggle("is-stuck", y > 4);
+    bar.style.transform = "scaleX(" + (max > 0 ? Math.min(1, y / max) : 0) + ")";
+    var line = window.innerHeight * 0.3, active = null;
+    secs.forEach(function (s) { if (s && s.getBoundingClientRect().top <= line) active = s.id; });
+    if (max - y < 4) active = "citation";
+    if (active === "scope") active = "lrsd";
+    if (active !== current) {
+      current = active;
+      links.forEach(function (a) {
+        var on = active && a.getAttribute("href") === "#" + active;
+        if (on) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current");
+      });
+    }
+  }
+  window.addEventListener("scroll", function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+  window.addEventListener("resize", onScroll);
+  onScroll();
+
+  /* contents disclosure (narrow screens) */
+  var tocBtn = document.getElementById("toc-btn"), toc = document.getElementById("toc-panel");
+  function setToc(open) { tocBtn.setAttribute("aria-expanded", String(open)); toc.hidden = !open; }
+  tocBtn.addEventListener("click", function () { setToc(toc.hidden); });
+  toc.addEventListener("click", function (e) { if (e.target.closest("a")) setToc(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !toc.hidden) { setToc(false); tocBtn.focus(); } });
+  document.addEventListener("click", function (e) { if (!toc.hidden && !nav.contains(e.target)) setToc(false); });
+
+  /* BibTeX copy */
+  var copyBtn = document.getElementById("copy-bib"), bib = document.getElementById("bibtex");
+  var label = copyBtn.querySelector("span"), status = document.getElementById("copy-status"), timer = 0;
+  var copyKey = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || "") ? "\u2318C" : "Ctrl+C";
+  function done(ok) {
+    label.textContent = ok ? "Copied" : "Press " + copyKey;
+    status.textContent = "";
+    requestAnimationFrame(function () {
+      status.textContent = ok ? "BibTeX copied to the clipboard." : "Could not copy automatically. The BibTeX is selected; press " + copyKey + " to copy it.";
+    });
+    if (ok) copyBtn.setAttribute("data-copied", "");
+    clearTimeout(timer);
+    timer = setTimeout(function () { label.textContent = "Copy"; copyBtn.removeAttribute("data-copied"); }, 2000);
+  }
+  function selectBib() {
+    var r = document.createRange(); r.selectNodeContents(bib);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  copyBtn.addEventListener("click", function () {
+    var text = bib.textContent;
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { selectBib(); done(document.execCommand && document.execCommand("copy")); });
+    } else {
+      selectBib();
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+      done(ok);
+    }
+  });
+  document.getElementById("hero-bibtex").addEventListener("click", function () {
+    setTimeout(function () { copyBtn.focus({ preventScroll: true }); }, 450);
+  });
+})();
+</script>
+</body>
+</html>

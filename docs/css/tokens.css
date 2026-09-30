@@ -1,0 +1,135 @@
+/* Design tokens shared by the page (style.css) and every visualization (docs/js/*.js).
+   Components read these by role through M2G.css('--name'); never hard-code colors in a component.
+   Light = the paper's colours (as in the README's light GIFs); dark = the reference dark palette. */
+/* Theme-independent tokens: type, radii, motion (added by the page). */
+:root {
+  --font-serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-body: var(--font-serif);
+  --font-ui: var(--font-sans);
+  --r-s: 6px;
+  --r-m: 10px;
+  --r-l: 14px;
+  --r-pill: 999px;
+  --ease-out: cubic-bezier(.22, .61, .36, 1);
+  --ease-io: cubic-bezier(.65, 0, .35, 1);
+  --dur-fast: 150ms;
+  --dur-med: 300ms;
+}
+:root {
+  color-scheme: light;
+  --bg: #ffffff;            /* page plane */
+  --surface: #ffffff;       /* figure / card surface */
+  --surface-2: #f6f5f2;     /* subtle fill: code blocks, table stripes, control tracks */
+  --ink: #0b0b0b;           /* primary text */
+  --ink-2: #52514e;         /* secondary text */
+  --muted: #6e6c66;         /* axis labels, captions meta (5.3:1 on white, 4.8:1 on --surface-2) */
+  --grid: #e1e0d9;          /* hairline gridlines */
+  --axis: #c3c2b7;          /* baselines, axes */
+  --border: rgba(11, 11, 11, 0.10);
+  --band: #e8f1f8;          /* phase band behind "memorized, not yet used" */
+  --stage: #ffffff;         /* background behind heat maps */
+  --mem: #1f77b4;           /* memorization (paper Fig. 4 blue) */
+  --gen: #b03f3f;           /* two-hop answer / generalization (paper Fig. 4 red) */
+  --good: #0ca30c;          /* status: only on the check glyph */
+  --bad: #d03b3b;           /* status: only on the cross glyph */
+  --arm-base: #8a8984;      /* plain fine-tuning (lambda = 0) */
+  --arm-l01: #2a78d6;       /* LRSD lambda = 0.1 */
+  --arm-l1: #eb6834;        /* LRSD lambda = 1 */
+  --entity: #1baf7a;        /* the head entity (SLC30A8) in the self-patching explainer */
+  --accent: #2a78d6;        /* links, focus, primary buttons */
+  --focus: #2a78d6;
+  /* added by the page (style.css) */
+  --ink-body: #1f1e1c;      /* long-form body text */
+  --border-strong: rgba(11, 11, 11, 0.22);
+  --connector: #c3c2b7;     /* dumbbell connectors */
+  --hover-wash: rgba(11, 11, 11, 0.045);
+  --plate: #ffffff;         /* behind paper PNGs */
+  --link: #1c5cab;          /* text links (AA on --bg) */
+  --link-hover: #154a8c;
+  --btn-bg: #1d1c1a;
+  --btn-bg-hover: #3a3936;
+  --btn-ink: #ffffff;
+  --tip-bg: #ffffff;
+  --tip-shadow: 0 6px 20px rgba(11, 11, 11, 0.12);
+  --nav-bg: rgba(255, 255, 255, 0.86);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #232321;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --muted: #95938d;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --band: #2b2521;
+  --stage: #1a1a19;
+  --mem: #3987e5;
+  --gen: #d95926;
+  --good: #0ca30c;
+  --bad: #d03b3b;
+  --arm-base: #a3a29c;
+  --arm-l01: #3987e5;
+  --arm-l1: #d95926;
+  --entity: #199e70;
+  --accent: #5598e7;
+  --focus: #5598e7;
+  /* added by the page (style.css) */
+  --ink-body: #e4e3dc;
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --connector: #52514e;
+  --hover-wash: rgba(255, 255, 255, 0.06);
+  --plate: #ecebe6;         /* paper PNGs keep their white ground, slightly dimmed */
+  --link: #86b6ef;
+  --link-hover: #a9cbf5;
+  --btn-bg: #efeee9;
+  --btn-bg-hover: #ffffff;
+  --btn-ink: #0b0b0b;
+  --tip-bg: #262624;
+  --tip-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --nav-bg: rgba(13, 13, 13, 0.82);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #95938d;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --band: #2b2521;
+    --stage: #1a1a19;
+    --mem: #3987e5;
+    --gen: #d95926;
+    --good: #0ca30c;
+    --bad: #d03b3b;
+    --arm-base: #a3a29c;
+    --arm-l01: #3987e5;
+    --arm-l1: #d95926;
+    --entity: #199e70;
+    --accent: #5598e7;
+    --focus: #5598e7;
+    /* added by the page (style.css) */
+    --ink-body: #e4e3dc;
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --connector: #52514e;
+    --hover-wash: rgba(255, 255, 255, 0.06);
+    --plate: #ecebe6;         /* paper PNGs keep their white ground, slightly dimmed */
+    --link: #86b6ef;
+    --link-hover: #a9cbf5;
+    --btn-bg: #efeee9;
+    --btn-bg-hover: #ffffff;
+    --btn-ink: #0b0b0b;
+    --tip-bg: #262624;
+    --tip-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --nav-bg: rgba(13, 13, 13, 0.82);
+  }
+}
