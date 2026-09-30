@@ -6,30 +6,33 @@ Code and data for the paper **"Towards Mechanistically Understanding Why Memoriz
   <img src="assets/teaser.png" width="95%" alt="The knowing-using gap: memorization saturates quickly while two-hop chaining accuracy lags far behind">
 </p>
 
-Fine-tuning an LLM on new facts teaches it to **recall** them within a few epochs. The same model often still cannot **use** them: it answers *"Where is Sydney located?"* and *"What is the capital of Australia?"* correctly, yet fails *"What is the capital of the country where Sydney is located?"*. This repository reproduces the paper's three core results on the two-hop **chaining** task built from the STaRK-Prime biomedical knowledge graph:
+Fine-tuning an LLM on new facts teaches it to **recall** them within a few epochs. The same model often still cannot **use** them: it answers *"Where is Sydney located?"* and *"What is the capital of Australia?"* correctly, yet fails *"What is the capital of the country where Sydney is located?"*. This repository reproduces the paper's core results:
 
 | | Result | Code |
 |---|---|---|
 | 1 | **Knowing–using gap.** Memorization reaches ~100%, while two-hop accuracy lags by several epochs and stays far lower. | [`train/`](train), [`validation/`](validation) |
-| 2 | **Self-patching oracle.** In the fine-tuned model, copying the entity representation from one layer to another in the *same* prompt restores many failed two-hop answers. The knowledge is stored, but not where the computation needs it. | [`patch/`](patch) |
-| 3 | **LRSD.** A layer-wise representation self-distillation loss aligns a middle layer with a late layer during fine-tuning. It nearly doubles chaining accuracy on Qwen2.5 (+95%), gives about +20% on LLaMA-3.2, and leaves memorization intact. | [`distill/`](distill) |
+| 2 | **Generalization restore oracle.** In the fine-tuned model, copying the entity representation from one layer to another in the *same* prompt restores many failed two-hop answers. The knowledge is stored, but not where the computation needs it. | [`patch/`](patch) |
+| 3 | **LRSD.** A layer-wise representation self-distillation loss aligns a middle layer with a late layer during fine-tuning. It nearly doubles generalization accuracy on Qwen2.5 (+95%), gives about +20% on LLaMA-3.2, and leaves memorization intact. | [`distill/`](distill) |
 
-### Watching new knowledge permeate the network
+<h3 align="center">🔬 Watching new knowledge permeate the network <sup>🎞️ animated</sup></h3>
 
 <p align="center">
   <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
 </p>
 
+> [!TIP]
+> **Stored ≠ usable.** Soon after the facts are memorized, the answer can already be read out *off* the diagonal, by moving the entity's state to another layer. The model answers on its own only once the bright region reaches the diagonal.
+
 Each map is a self-patching scan of one fine-tuning checkpoint: LLaMA-3.1-8B fine-tuned on the two facts of one chaining item (Figure 4 of the paper).
 
 - **Cell (*s*, *t*).** Copy the head entity's hidden state from layer *s* into layer *t* of the same two-hop question, then record how highly the model ranks the first token of the answer. Bright means ranked first.
-- **Diagonal.** The model as is, with no patch.
+- **Diagonal.** Natural status without intervention.
 
 What the animation shows:
 
-- **Memorized, not yet used.** In the epochs after both facts are memorized, cells that rank the answer first appear *off* the diagonal. In the left run the first appears at epoch 9 and there are 15 by epoch 10; in the right run they appear from epoch 10. The knowledge is stored, but not at the layers where the two-hop computation reads it.
-- **Left run.** The bright region grows until it covers the diagonal at epoch 21. From then on the model answers the two-hop question with no patch.
-- **Right run.** The region stops growing at about 6% of layer pairs and never covers the diagonal, and the two-hop question is never answered.
+- **Memorized, not yet used.** In the epochs after both facts are memorized, cells are lightened first appear *off* the diagonal. This means the knowledge is stored and can be extracted by intervention, but cannot be naturally read-out at the layers where the two-hop computation reads it.
+- **Successful generalization run (Left).** The bright region grows until it covers the diagonal at epoch 21. From then on the model answers the two-hop question with no patch.
+- **Failed generalization run (Right).** The region stops growing at about 6% of layer pairs and never covers the diagonal, and the two-hop question is never answered naturally during SFT if without intervention.
 
 ## Contents
 
