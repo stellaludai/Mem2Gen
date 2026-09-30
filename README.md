@@ -14,7 +14,9 @@ Fine-tuning an LLM on new facts teaches it to **recall** them within a few epoch
 | 2 | **Generalization restore oracle.** In the fine-tuned model, copying the entity representation from one layer to another in the *same* prompt restores many failed two-hop answers. The knowledge is stored, but not where the computation needs it. | [`patch/`](patch) |
 | 3 | **LRSD.** A layer-wise representation self-distillation loss aligns a middle layer with a late layer during fine-tuning. It nearly doubles generalization accuracy on Qwen2.5 (+95%), gives about +20% on LLaMA-3.2, and leaves memorization intact. | [`distill/`](distill) |
 
-<h3 align="center">🔬 Watching new knowledge permeate the network <sup>🎞️ animated</sup></h3>
+<p align="center">
+  <img src="assets/permeation_banner.png" width="100%" alt="Watching new knowledge permeate the network: a self-patching map at epochs 10, 15 and 21 of one fine-tuning run, from stored to spreading to used">
+</p>
 
 <p align="center">
   <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
