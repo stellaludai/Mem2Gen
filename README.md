@@ -14,13 +14,16 @@ Fine-tuning an LLM on new facts teaches it to **recall** them within a few epoch
 | 2 | **Generalization restore oracle.** In the fine-tuned model, copying the entity representation from one layer to another in the *same* prompt restores many failed two-hop answers. The knowledge is stored, but not where the computation needs it. | [`patch/`](patch) |
 | 3 | **LRSD.** A layer-wise representation self-distillation loss aligns a middle layer with a late layer during fine-tuning. It nearly doubles generalization accuracy on Qwen2.5 (+95%), gives about +20% on LLaMA-3.2, and leaves memorization intact. | [`distill/`](distill) |
 
-> [!TIP]
-> ### 🔬 Watching new knowledge permeate the network
-> **Stored ≠ usable.** Soon after the facts are memorized, the answer can already be read out *off* the diagonal, by moving the entity's state to another layer. The model answers on its own only once the bright region reaches the diagonal.
+<h2 align="center">🔬 Watching new knowledge permeate the network</h2>
+
+<p align="center"><em>After a fact is memorized, where can it be read out, and when does the model start using it?</em></p>
 
 <p align="center">
   <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
 </p>
+
+> [!TIP]
+> **Stored ≠ usable.** Soon after the facts are memorized, the answer can already be read out *off* the diagonal, by moving the entity's state to another layer. The model answers on its own only once the bright region reaches the diagonal.
 
 Each map is a self-patching scan of one fine-tuning checkpoint: LLaMA-3.1-8B fine-tuned on the two facts of one chaining item (Figure 4 of the paper).
 
