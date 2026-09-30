@@ -19,21 +19,24 @@ Fine-tuning an LLM on new facts teaches it to **recall** them within a few epoch
 <p align="center"><em>After a fact is memorized, where can it be read out, and when does the model start using it?</em></p>
 
 <p align="center">
-  <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/permeation_dark.gif">
+    <img src="assets/permeation.gif" width="100%" alt="Self-patching maps of two fine-tuning runs, epoch by epoch: after memorization, cells that rank the answer first appear off the diagonal and spread; in the left run they cover the diagonal and the model starts answering, in the right run they stop growing">
+  </picture>
 </p>
 
 > [!TIP]
-> **Stored ≠ usable.** Soon after the facts are memorized, the answer can already be read out *off* the diagonal, by moving the entity's state to another layer. The model answers on its own only once the bright region reaches the diagonal.
+> **Stored ≠ usable.** Soon after the facts are memorized, the answer can already be read out *off* the diagonal, by moving the entity's state to another layer. The model answers on its own only once the region where the answer ranks first reaches the diagonal.
 
 Each map is a self-patching scan of one fine-tuning checkpoint: LLaMA-3.1-8B fine-tuned on the two facts of one chaining item (Figure 4 of the paper).
 
-- **Cell (*s*, *t*).** Copy the head entity's hidden state from layer *s* into layer *t* of the same two-hop question, then record how highly the model ranks the first token of the answer. Bright means ranked first.
+- **Cell (*s*, *t*).** Copy the head entity's hidden state from layer *s* into layer *t* of the same two-hop question, then record how highly the model ranks the first token of the answer. Red (light theme) or amber (dark theme) means ranked first.
 - **Diagonal.** Natural status without intervention.
 
 What the animation shows:
 
-- **Memorized, not yet used.** In the epochs after both facts are memorized, cells are lightened first appear *off* the diagonal. This means the knowledge is stored and can be extracted by intervention, but cannot be naturally read-out at the layers where the two-hop computation reads it.
-- **Successful generalization run (Left).** The bright region grows until it covers the diagonal at epoch 21. From then on the model answers the two-hop question with no patch.
+- **Memorized, not yet used.** In the epochs after both facts are memorized, the first cells that rank the answer first appear *off* the diagonal. This means the knowledge is stored and can be extracted by intervention, but cannot be naturally read-out at the layers where the two-hop computation reads it.
+- **Successful generalization run (Left).** The region where the answer ranks first grows until it covers the diagonal at epoch 21. From then on the model answers the two-hop question with no patch.
 - **Failed generalization run (Right).** The region stops growing at about 6% of layer pairs and never covers the diagonal, and the two-hop question is never answered naturally during SFT if without intervention.
 
 ## Contents
@@ -144,7 +147,10 @@ Scanning all *L × L* layer pairs gives a map whose diagonal is the unpatched mo
 Scanned at every epoch of a per-fact run, these maps show the knowledge permeating, as in the animation at the top. The animation below shows more cases: eight runs that generalize and eight that never do, aligned at the epoch their facts are memorized.
 
 <p align="center">
-  <img src="assets/permeation_mosaic.gif" width="100%" alt="More cases of knowledge permeation: self-patching maps of 16 fine-tuning runs aligned at memorization; in the eight runs that generalize the bright region spreads until it covers the diagonal and the model starts answering, in the eight that never generalize it stops short of the diagonal">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/permeation_mosaic_dark.gif">
+    <img src="assets/permeation_mosaic.gif" width="100%" alt="More cases of knowledge permeation: self-patching maps of 16 fine-tuning runs aligned at memorization; in the eight runs that generalize the cells that rank the answer first spread until they cover the diagonal and the model starts answering, in the eight that never generalize they stop short of the diagonal">
+  </picture>
 </p>
 
 
